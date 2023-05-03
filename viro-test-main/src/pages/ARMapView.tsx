@@ -194,6 +194,7 @@ const MyScene = props => {
 
       if (isAndroid) {
         let degree = geoState.compassHeading;
+        console.log('디그리는', degree);
         let angleRadian = (degree * Math.PI) / 180;
         let newObjX =
           objDeltaX * Math.cos(angleRadian) - objDeltaY * Math.sin(angleRadian);
@@ -233,6 +234,7 @@ const MyScene = props => {
       latitude: item.lat,
       longitude: item.lng,
     });
+    console.log('heading 확인', geoState.compassHeading);
     console.log('여긴 coords', coords);
     console.log('distance', distance);
 
