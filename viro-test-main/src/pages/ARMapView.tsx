@@ -1,31 +1,20 @@
 import React, {useState, useEffect, useCallback, useRef} from 'react';
-import {
-  View,
-  Text,
-  Platform,
-  ToastAndroid,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import {View, Platform, ToastAndroid, StyleSheet} from 'react-native';
 import {
   ViroARScene,
   ViroText,
   ViroARSceneNavigator,
-  ViroBox,
-  ViroMaterials,
-  ViroAnimations,
-  Viro3DObject,
-  ViroAmbientLight,
   ViroImage,
   ViroNode,
   ViroFlexView,
 } from '@viro-community/react-viro';
 import Geolocation from '@react-native-community/geolocation';
 import CompassHeading from 'react-native-compass-heading';
+import usePermissions from '../hooks/usePermissions';
 // import {requestMultiple, PERMISSIONS, RESULTS} from 'react-native-permissions';
 
 // Geo 처리를 위한 세팅
-const MAPS_API_KEY = '';
+const MAPS_API_KEY = 'AIzaSyAXcRud9HuA2CV2ovoudZFlCTWX-K396hM';
 const PlacesAPIURL = (lat, lng) =>
   `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=50&key=${MAPS_API_KEY}`;
 
@@ -62,6 +51,8 @@ const distanceBetweenPoints = (p1, p2) => {
 const MyScene = props => {
   let data = props.sceneNavigator.viroAppProps;
 
+  usePermissions();
+
   // 최초 실행시 확인
   const [tracking, setTracking] = useState(false);
 
@@ -79,8 +70,8 @@ const MyScene = props => {
   }, []);
 
   const [state, setState] = useState({
-    cameraReady: false,
-    locationReady: false,
+    cameraReady: true,
+    locationReady: true,
     location: undefined,
     nearbyPlaces: [],
     tracking: false,
@@ -91,6 +82,7 @@ const MyScene = props => {
 
   // compassHeading 처리를 위한 useEffect, mount시 설정, unmount시 해제
   useEffect(() => {
+    getCurrentLocation();
     CompassHeading.start(3, heading => {
       setState(prevState => ({...prevState, compassHeading: heading}));
     });
@@ -105,19 +97,27 @@ const MyScene = props => {
   // 최근 위치 받아오기
   const getCurrentLocation = useCallback(() => {
     if (state.cameraReady && state.locationReady) {
-      const geoSuccess = result => {
-        setState(prevState => ({
-          ...prevState,
-          location: result.coords,
-        }));
-        getNearbyPlaces();
+      const geoSuccess = async result => {
+        console.log('geoSuccess', result);
+        await new Promise(resolve =>
+          setState(prevState => ({
+            ...prevState,
+            location: result.coords,
+          })),
+        );
       };
 
-      listener.current = Geolocation.watchPosition(geoSuccess, error => {}, {
-        distanceFilter: 10,
-      });
+      listener.current = Geolocation.watchPosition(
+        geoSuccess,
+        error => {
+          console.error('geoError', error.message);
+        },
+        {
+          distanceFilter: 10,
+        },
+      );
     }
-  }, [state.cameraReady, state.locationReady, getNearbyPlaces]);
+  }, [state.cameraReady, state.locationReady]);
 
   // 근처 값 받아오기
   const getNearbyPlaces = useCallback(async () => {
@@ -125,6 +125,7 @@ const MyScene = props => {
     try {
       const response = await fetch(URL);
       const responseJson = await response.json();
+      console.log('getNearbyPlaces', response);
 
       if (responseJson.status === 'OK') {
         const places = responseJson.results.map(rawPlace => {
@@ -144,6 +145,12 @@ const MyScene = props => {
       console.error(error);
     }
   }, [state.location]);
+
+  useEffect(() => {
+    if (state.location) {
+      getNearbyPlaces();
+    }
+  }, [state.location, getNearbyPlaces]);
 
   // 위도, 경도 값을 m 단위로로 계산
   const latLongToMerc = useCallback((latDeg, longDeg) => {
@@ -192,12 +199,16 @@ const MyScene = props => {
     }
 
     return state.nearbyPlaces.map(item => {
+      console.log('여기서부터 item', item);
       const coords = transformGpsToAR(item.lat, item.lng);
       const scale = Math.abs(Math.round(coords.z / 15));
       const distance = distanceBetweenPoints(state.location, {
         latitude: item.lat,
         longitude: item.lng,
       });
+
+      console.log('여긴 coords', coords);
+      console.log('여긴 distance', distance);
 
       return (
         <ViroNode
@@ -223,7 +234,7 @@ const MyScene = props => {
             <ViroImage
               width={1}
               height={1}
-              source={{uri: '../assets/logo.svg'}}
+              source={{uri: item.icon}}
               position={[0, -1.5, 0]}
             />
           </ViroFlexView>
