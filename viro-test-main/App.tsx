@@ -15,6 +15,7 @@ import {RootStackParamList} from './src/types';
 import Chatroom from './src/pages/Chatroom';
 import CreateMoim from './src/pages/CreateMoim';
 import ARMapView from './src/pages/ARMapView';
+import usePermissions from './src/hooks/usePermissions';
 
 export type LoggedInParamList = {
   Orders: undefined;
@@ -27,6 +28,8 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function App() {
   // const [isLoggedIn, setLoggedIn] = useState(false);
+  usePermissions();
+
   return (
     <NavigationContainer>
       <Stack.Navigator>
