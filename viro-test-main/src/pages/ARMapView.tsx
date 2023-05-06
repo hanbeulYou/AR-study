@@ -7,6 +7,7 @@ import {
   ViroImage,
   ViroNode,
   ViroFlexView,
+  ViroBox,
 } from '@viro-community/react-viro';
 import Geolocation from '@react-native-community/geolocation';
 import CompassHeading from 'react-native-compass-heading';
@@ -69,7 +70,7 @@ const MyScene = props => {
     setTracking(isTracking);
   }, []);
 
-  const [state, setState] = useState({
+  const [geoState, setGeoState] = useState({
     cameraReady: true,
     locationReady: true,
     location: undefined,
@@ -82,10 +83,14 @@ const MyScene = props => {
 
   // compassHeading 처리를 위한 useEffect, mount시 설정, unmount시 해제
   useEffect(() => {
-    getCurrentLocation();
-    CompassHeading.start(3, heading => {
-      setState(prevState => ({...prevState, compassHeading: heading}));
-    });
+    if (!listener.current) {
+      CompassHeading.start(3, heading => {
+        console.log('heading', heading);
+        setGeoState({compassHeading: heading});
+      });
+      getCurrentLocation();
+      CompassHeading.stop();
+    }
     return () => {
       if (listener.current) {
         Geolocation.clearWatch(listener.current);
@@ -96,11 +101,11 @@ const MyScene = props => {
 
   // 최근 위치 받아오기
   const getCurrentLocation = useCallback(() => {
-    if (state.cameraReady && state.locationReady) {
+    if (geoState.cameraReady && geoState.locationReady) {
       const geoSuccess = async result => {
         console.log('geoSuccess', result);
         await new Promise(resolve =>
-          setState(prevState => ({
+          setGeoState(prevState => ({
             ...prevState,
             location: result.coords,
           })),
@@ -117,40 +122,50 @@ const MyScene = props => {
         },
       );
     }
-  }, [state.cameraReady, state.locationReady]);
+  }, [geoState.cameraReady, geoState.locationReady]);
 
   // 근처 값 받아오기
   const getNearbyPlaces = useCallback(async () => {
-    const URL = PlacesAPIURL(state.location.latitude, state.location.longitude);
-    try {
-      const response = await fetch(URL);
-      const responseJson = await response.json();
-      console.log('getNearbyPlaces', response);
+    // const URL = PlacesAPIURL(state.location.latitude, state.location.longitude);
+    // try {
+    //   const response = await fetch(URL);
+    //   const responseJson = await response.json();
+    //   console.log('getNearbyPlaces', response);
 
-      if (responseJson.status === 'OK') {
-        const places = responseJson.results.map(rawPlace => {
-          return {
-            id: rawPlace.place_id,
-            title: rawPlace.name,
-            lat: rawPlace.geometry.location.lat,
-            lng: rawPlace.geometry.location.lng,
-            icon: rawPlace.icon,
-          };
-        });
-        setState(prevState => ({...prevState, nearbyPlaces: places}));
-      } else {
-        console.warn(responseJson.status);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  }, [state.location]);
+    //   if (responseJson.status === 'OK') {
+    //     const places = responseJson.results.map(rawPlace => {
+    //       return {
+    //         id: rawPlace.place_id,
+    //         title: rawPlace.name,
+    //         lat: rawPlace.geometry.location.lat,
+    //         lng: rawPlace.geometry.location.lng,
+    //         icon: rawPlace.icon,
+    //       };
+    //     });
+    //     setGeoState(prevState => ({...prevState, nearbyPlaces: places}));
+    //   } else {
+    //     console.warn(responseJson.status);
+    //   }
+    // } catch (error) {
+    //   console.error(error);
+    // }
+    const places = [
+      {
+        id: 0,
+        title: 'SSAFY',
+        lat: 37.50140451172083,
+        lng: 127.03979415506103,
+        icon: 'https://scontent-ssn1-1.xx.fbcdn.net/v/t1.6435-9/71141193_2565410353480610_6037255603217235968_n.png?_nc_cat=101&ccb=1-7&_nc_sid=e3f864&_nc_ohc=w8_pfVyLYaMAX8EuvLt&_nc_ht=scontent-ssn1-1.xx&oh=00_AfAV95Avg9lZ9XtFFtIm_RD0NmysVmPE4TjZTG8Ij3ULhg&oe=6479FCBC',
+      },
+    ];
+    setGeoState(prevState => ({...prevState, nearbyPlaces: places}));
+  }, [geoState.location]);
 
   useEffect(() => {
-    if (state.location) {
+    if (geoState.location) {
       getNearbyPlaces();
     }
-  }, [state.location, getNearbyPlaces]);
+  }, [geoState.location, getNearbyPlaces]);
 
   // 위도, 경도 값을 m 단위로로 계산
   const latLongToMerc = useCallback((latDeg, longDeg) => {
@@ -169,8 +184,8 @@ const MyScene = props => {
       const isAndroid = Platform.OS === 'android';
       const latObj = lat;
       const longObj = lng;
-      const latMobile = state.location.latitude;
-      const longMobile = state.location.longitude;
+      const latMobile = geoState.location.latitude;
+      const longMobile = geoState.location.longitude;
 
       const deviceObjPoint = latLongToMerc(latObj, longObj);
       const mobilePoint = latLongToMerc(latMobile, longMobile);
@@ -178,92 +193,96 @@ const MyScene = props => {
       const objDeltaX = deviceObjPoint.x - mobilePoint.x;
 
       if (isAndroid) {
-        let degree = state.compassHeading;
+        let degree = geoState.compassHeading;
+        console.log('디그리는', degree);
         let angleRadian = (degree * Math.PI) / 180;
         let newObjX =
           objDeltaX * Math.cos(angleRadian) - objDeltaY * Math.sin(angleRadian);
         let newObjY =
           objDeltaX * Math.sin(angleRadian) + objDeltaY * Math.cos(angleRadian);
+
         return {x: newObjX, z: -newObjY};
       }
 
       return {x: objDeltaX, z: -objDeltaY};
     },
-    [latLongToMerc, state.compassHeading, state.location],
+    [latLongToMerc, geoState.compassHeading, geoState.location],
   );
 
   // 메인 함수
   const placeARObjects = useCallback(() => {
-    if (state.nearbyPlaces.length === 0) {
+    if (geoState.nearbyPlaces.length === 0) {
       return undefined;
     }
 
-    return state.nearbyPlaces.map(item => {
-      console.log('여기서부터 item', item);
-      const coords = transformGpsToAR(item.lat, item.lng);
-      const scale = Math.abs(Math.round(coords.z / 15));
-      const distance = distanceBetweenPoints(state.location, {
-        latitude: item.lat,
-        longitude: item.lng,
-      });
+    // return geoState.nearbyPlaces.map(item => {
+    //   console.log('여기서부터 item', item);
+    //   const coords = transformGpsToAR(item.lat, item.lng);
+    //   // const scale = Math.abs(Math.round(coords.z / 15));
+    //   const scale = 1000000;
+    //   const distance = distanceBetweenPoints(geoState.location, {
+    //     latitude: item.lat,
+    //     longitude: item.lng,
+    //   });
 
-      console.log('여긴 coords', coords);
-      console.log('여긴 distance', distance);
-
-      return (
-        <ViroNode
-          key={item.id}
-          scale={[scale, scale, scale]}
-          rotation={[0, 0, 0]}
-          position={[coords.x, 0, coords.z]}>
-          <ViroFlexView
-            style={{alignItems: 'center', justifyContent: 'center'}}>
-            <ViroText
-              width={4}
-              height={0.5}
-              text={item.title}
-              style={styles.helloWorldTextStyle}
-            />
-            <ViroText
-              width={4}
-              height={0.5}
-              text={`${Number(distance).toFixed(2)} km`}
-              style={styles.helloWorldTextStyle}
-              position={[0, -0.75, 0]}
-            />
-            <ViroImage
-              width={1}
-              height={1}
-              source={{uri: item.icon}}
-              position={[0, -1.5, 0]}
-            />
-          </ViroFlexView>
-        </ViroNode>
-      );
+    const item = geoState.nearbyPlaces[0];
+    console.log('여기서부터 item', item);
+    const coords = transformGpsToAR(item.lat, item.lng);
+    // const scale = Math.abs(Math.round(coords.z / 15));
+    const scale = 100;
+    const distance = distanceBetweenPoints(geoState.location, {
+      latitude: item.lat,
+      longitude: item.lng,
     });
-  }, [state.nearbyPlaces, state.location, transformGpsToAR]);
+    console.log('heading 확인', geoState.compassHeading);
+    console.log('여긴 coords', coords);
+    console.log('distance', distance);
+
+    return (
+      <ViroBox
+        key={geoState.nearbyPlaces[0].id}
+        height={2}
+        length={2}
+        width={2}
+        scale={[800, 800, 800]}
+        // position={[0, 0, -300]}
+        position={[coords.x, 0, coords.z]}
+      />
+      // <ViroNode
+      //   key={item.id}
+      //   scale={[scale, scale, scale]}
+      //   rotation={[0, 0, 0]}
+      //   position={[coords.x, 0, coords.z]}>
+      //   <ViroFlexView
+      //     style={{alignItems: 'center', justifyContent: 'center'}}>
+      //     <ViroText
+      //       width={4}
+      //       height={0.5}
+      //       text={item.title}
+      //       style={styles.helloWorldTextStyle}
+      //     />
+      //     <ViroText
+      //       width={4}
+      //       height={0.5}
+      //       text={`${Number(distance).toFixed(2)} km`}
+      //       style={styles.helloWorldTextStyle}
+      //       position={[0, -0.75, 0]}
+      //     />
+      //     <ViroImage
+      //       width={1}
+      //       height={1}
+      //       source={{uri: item.icon}}
+      //       position={[0, -1.5, 0]}
+      //     />
+      //   </ViroFlexView>
+      // </ViroNode>
+    );
+    // });
+  }, [geoState.nearbyPlaces, geoState.location, transformGpsToAR]);
 
   return (
     <ViroARScene onTrackingUpdated={onInitialized}>
-      {state.locationReady && state.cameraReady && placeARObjects()}
-      {/* <ViroAmbientLight color="#ffffff" />
-      {data.object === 'dog' ? (
-        <Viro3DObject
-          source={require('../assets/3dObj/stuffed_animal_v1_L2.123c64d38a59-f755-4bbb-bd3f-8116fb11f93f/11706_stuffed_animal_L2.obj')}
-          scale={[0.05, 0.05, 0.05]}
-          position={[0, 0, -10]}
-          rotation={[90, 150, 180]}
-          type="OBJ"
-        />
-      ) : (
-        <Viro3DObject
-          source={require('../assets/3dObj/Cat_v1_L3.123cb1b1943a-2f48-4e44-8f71-6bbe19a3ab64/12221_Cat_v1_l3.obj')}
-          scale={[0.05, 0.05, 0.05]}
-          position={[0, 0, -10]}
-          rotation={[90, 150, 180]}
-          type="OBJ"
-        />
-      )} */}
+      {geoState.locationReady && geoState.cameraReady && placeARObjects()}
     </ViroARScene>
   );
 };
@@ -276,19 +295,6 @@ let styles = StyleSheet.create({
     color: '#000000',
     textAlignVertical: 'center',
     textAlign: 'center',
-  },
-  controlsView: {
-    width: '100%',
-    height: 100,
-    backgroundColor: '#ffffff',
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  text: {
-    margin: 20,
-    padding: 10,
-    fontWeight: 'bold',
   },
 });
 
@@ -305,14 +311,6 @@ function ARMapView() {
         viroAppProps={{object: object}}
         style={styles.f1}
       />
-      {/* <View style={styles.controlsView}>
-        <TouchableOpacity onPress={() => setObject('dog')}>
-          <Text style={styles.text}>Display Dog</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setObject('cat')}>
-          <Text style={styles.text}>Display Cat</Text>
-        </TouchableOpacity>
-      </View> */}
     </View>
   );
 }
