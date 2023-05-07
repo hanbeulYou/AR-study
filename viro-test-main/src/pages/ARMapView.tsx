@@ -15,7 +15,7 @@ import usePermissions from '../hooks/usePermissions';
 // import {requestMultiple, PERMISSIONS, RESULTS} from 'react-native-permissions';
 
 // Geo 처리를 위한 세팅
-const MAPS_API_KEY = 'AIzaSyAXcRud9HuA2CV2ovoudZFlCTWX-K396hM';
+const MAPS_API_KEY = '';
 const PlacesAPIURL = (lat, lng) =>
   `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=50&key=${MAPS_API_KEY}`;
 
@@ -83,14 +83,12 @@ const MyScene = props => {
 
   // compassHeading 처리를 위한 useEffect, mount시 설정, unmount시 해제
   useEffect(() => {
-    if (!listener.current) {
-      CompassHeading.start(3, heading => {
-        console.log('heading', heading);
-        setGeoState({compassHeading: heading});
-      });
-      getCurrentLocation();
-      CompassHeading.stop();
-    }
+    CompassHeading.start(3, heading => {
+      console.log('heading', heading);
+      setGeoState({compassHeading: heading});
+    });
+    getCurrentLocation();
+
     return () => {
       if (listener.current) {
         Geolocation.clearWatch(listener.current);
@@ -101,15 +99,17 @@ const MyScene = props => {
 
   // 최근 위치 받아오기
   const getCurrentLocation = useCallback(() => {
-    if (geoState.cameraReady && geoState.locationReady) {
-      const geoSuccess = async result => {
+    if (
+      geoState.cameraReady &&
+      geoState.locationReady &&
+      geoState.compassHeading
+    ) {
+      const geoSuccess = result => {
         console.log('geoSuccess', result);
-        await new Promise(resolve =>
-          setGeoState(prevState => ({
-            ...prevState,
-            location: result.coords,
-          })),
-        );
+        setGeoState(prevState => ({
+          ...prevState,
+          location: result.coords,
+        }));
       };
 
       listener.current = Geolocation.watchPosition(
@@ -122,7 +122,7 @@ const MyScene = props => {
         },
       );
     }
-  }, [geoState.cameraReady, geoState.locationReady]);
+  }, [geoState.cameraReady, geoState.locationReady, geoState.compassHeading]);
 
   // 근처 값 받아오기
   const getNearbyPlaces = useCallback(async () => {
