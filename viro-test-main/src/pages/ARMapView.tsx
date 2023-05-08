@@ -81,12 +81,12 @@ const MyScene = props => {
   // compassHeading 처리를 위한 useEffect, mount시 설정, unmount시 해제
   useEffect(() => {
     CompassHeading.start(3, heading => {
-      console.log('heading', heading.heading);
-      const newGeoState = {...geoState};
-      newGeoState.compassHeading = heading.heading;
-      console.log(geoState);
-      console.log(newGeoState);
-      setGeoState(newGeoState);
+      if (geoState.compassHeading === 0) {
+        const newGeoState = {...geoState};
+        newGeoState.compassHeading = heading.heading;
+        setGeoState(newGeoState);
+        CompassHeading.stop();
+      }
     });
 
     return () => {
@@ -126,7 +126,7 @@ const MyScene = props => {
         },
       );
     }
-  }, [geoState.cameraReady, geoState.locationReady, geoState.compassHeading]);
+  }, [geoState]);
 
   // 목적지 값 받아오기
   const getNearbyPlaces = useCallback(async () => {
@@ -136,6 +136,13 @@ const MyScene = props => {
         title: 'SSAFY',
         lat: 37.50140451172083,
         lng: 127.03979415506103,
+        icon: 'https://scontent-ssn1-1.xx.fbcdn.net/v/t1.6435-9/71141193_2565410353480610_6037255603217235968_n.png?_nc_cat=101&ccb=1-7&_nc_sid=e3f864&_nc_ohc=w8_pfVyLYaMAX8EuvLt&_nc_ht=scontent-ssn1-1.xx&oh=00_AfAV95Avg9lZ9XtFFtIm_RD0NmysVmPE4TjZTG8Ij3ULhg&oe=6479FCBC',
+      },
+      {
+        id: 1,
+        title: 'Church',
+        lat: 37.50230698208923,
+        lng: 127.05801958547242,
         icon: 'https://scontent-ssn1-1.xx.fbcdn.net/v/t1.6435-9/71141193_2565410353480610_6037255603217235968_n.png?_nc_cat=101&ccb=1-7&_nc_sid=e3f864&_nc_ohc=w8_pfVyLYaMAX8EuvLt&_nc_ht=scontent-ssn1-1.xx&oh=00_AfAV95Avg9lZ9XtFFtIm_RD0NmysVmPE4TjZTG8Ij3ULhg&oe=6479FCBC',
       },
     ];
@@ -208,11 +215,11 @@ const MyScene = props => {
     //     longitude: item.lng,
     //   });
 
-    const item = geoState.nearbyPlaces[0];
+    const item = geoState.nearbyPlaces[1];
     console.log('여기서부터 item', item);
     const coords = transformGpsToAR(item.lat, item.lng);
-    // const scale = Math.abs(Math.round(coords.z / 15));
-    const scale = 100;
+    const scale = Math.abs(Math.round(coords.z / 15));
+    // const scale = 100;
     const distance = distanceBetweenPoints(geoState.location, {
       latitude: item.lat,
       longitude: item.lng,
@@ -224,10 +231,10 @@ const MyScene = props => {
     return (
       <ViroBox
         key={geoState.nearbyPlaces[0].id}
-        height={2}
-        length={2}
-        width={2}
-        scale={[800, 800, 800]}
+        height={10}
+        length={10}
+        width={10}
+        scale={[scale, scale, scale]}
         // position={[0, 0, -300]}
         position={[coords.x, 0, coords.z]}
       />
