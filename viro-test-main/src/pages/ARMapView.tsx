@@ -2,11 +2,8 @@ import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {View, Platform, ToastAndroid, StyleSheet} from 'react-native';
 import {
   ViroARScene,
-  ViroText,
   ViroARSceneNavigator,
-  ViroImage,
-  ViroNode,
-  ViroFlexView,
+  ViroARPlaneSelector,
   ViroBox,
 } from '@viro-community/react-viro';
 import Geolocation from '@react-native-community/geolocation';
@@ -84,10 +81,13 @@ const MyScene = props => {
   // compassHeading 처리를 위한 useEffect, mount시 설정, unmount시 해제
   useEffect(() => {
     CompassHeading.start(3, heading => {
-      console.log('heading', heading);
-      setGeoState({compassHeading: heading});
+      console.log('heading', heading.heading);
+      const newGeoState = {...geoState};
+      newGeoState.compassHeading = heading.heading;
+      console.log(geoState);
+      console.log(newGeoState);
+      setGeoState(newGeoState);
     });
-    getCurrentLocation();
 
     return () => {
       if (listener.current) {
@@ -96,6 +96,10 @@ const MyScene = props => {
       CompassHeading.stop();
     };
   }, []);
+
+  useEffect(() => {
+    getCurrentLocation();
+  }, [geoState.compassHeading]);
 
   // 최근 위치 받아오기
   const getCurrentLocation = useCallback(() => {
@@ -106,10 +110,10 @@ const MyScene = props => {
     ) {
       const geoSuccess = result => {
         console.log('geoSuccess', result);
-        setGeoState(prevState => ({
-          ...prevState,
-          location: result.coords,
-        }));
+        const newGeoState = {...geoState};
+        newGeoState.location = result.coords;
+        console.log('newGeo', newGeoState);
+        setGeoState(newGeoState);
       };
 
       listener.current = Geolocation.watchPosition(
@@ -124,31 +128,8 @@ const MyScene = props => {
     }
   }, [geoState.cameraReady, geoState.locationReady, geoState.compassHeading]);
 
-  // 근처 값 받아오기
+  // 목적지 값 받아오기
   const getNearbyPlaces = useCallback(async () => {
-    // const URL = PlacesAPIURL(state.location.latitude, state.location.longitude);
-    // try {
-    //   const response = await fetch(URL);
-    //   const responseJson = await response.json();
-    //   console.log('getNearbyPlaces', response);
-
-    //   if (responseJson.status === 'OK') {
-    //     const places = responseJson.results.map(rawPlace => {
-    //       return {
-    //         id: rawPlace.place_id,
-    //         title: rawPlace.name,
-    //         lat: rawPlace.geometry.location.lat,
-    //         lng: rawPlace.geometry.location.lng,
-    //         icon: rawPlace.icon,
-    //       };
-    //     });
-    //     setGeoState(prevState => ({...prevState, nearbyPlaces: places}));
-    //   } else {
-    //     console.warn(responseJson.status);
-    //   }
-    // } catch (error) {
-    //   console.error(error);
-    // }
     const places = [
       {
         id: 0,
@@ -158,7 +139,9 @@ const MyScene = props => {
         icon: 'https://scontent-ssn1-1.xx.fbcdn.net/v/t1.6435-9/71141193_2565410353480610_6037255603217235968_n.png?_nc_cat=101&ccb=1-7&_nc_sid=e3f864&_nc_ohc=w8_pfVyLYaMAX8EuvLt&_nc_ht=scontent-ssn1-1.xx&oh=00_AfAV95Avg9lZ9XtFFtIm_RD0NmysVmPE4TjZTG8Ij3ULhg&oe=6479FCBC',
       },
     ];
-    setGeoState(prevState => ({...prevState, nearbyPlaces: places}));
+    const newGeoState = {...geoState};
+    newGeoState.nearbyPlaces = [...places];
+    setGeoState(newGeoState);
   }, [geoState.location]);
 
   useEffect(() => {
