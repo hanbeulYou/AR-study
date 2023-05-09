@@ -9,9 +9,12 @@ import {
   ViroFlexView,
   ViroText,
   ViroImage,
+  ViroARPlane,
+  ViroMaterials,
+  ViroPolyline,
 } from '@viro-community/react-viro';
 import Geolocation from '@react-native-community/geolocation';
-import CompassHeading from 'react-native-compass-heading';
+import CompassHeading, {start} from 'react-native-compass-heading';
 import usePermissions from '../hooks/usePermissions';
 // import {requestMultiple, PERMISSIONS, RESULTS} from 'react-native-permissions';
 
@@ -30,6 +33,12 @@ const Toast = message => {
     50,
   );
 };
+
+ViroMaterials.createMaterials({
+  coloredLine: {
+    diffuseColor: 'rgba(255, 0, 0, 1)',
+  },
+});
 
 const distanceBetweenPoints = (p1, p2) => {
   if (!p1 || !p2) {
@@ -73,14 +82,49 @@ const MyScene = props => {
 
   const [geoState, setGeoState] = useState({
     cameraReady: true,
-    locationReady: true,
+    locationReady: false,
     location: undefined,
     nearbyPlaces: [],
     tracking: false,
     compassHeading: 0,
   });
 
+  const [lineState, setLineState] = useState([]);
+
   const listener = useRef(null);
+
+  const getLines = useCallback(() => {
+    console.log('getLines 들어옴');
+    if (
+      geoState.nearbyPlaces.length === 0 ||
+      lineState.length === geoState.nearbyPlaces.length
+    ) {
+      console.log('하지만 리턴 당함');
+      return [];
+    }
+
+    // const initGeo = geoState.nearbyPlaces[0];
+    // const initCoords = transformGpsToAR(initGeo.lat, initGeo.lng);
+    // const newLineState = [
+    //   [0, 0, 0],
+    //   [initCoords.x, 0, initCoords.z],
+    // ];
+    const newLineState = [];
+    for (let i = 0; i < geoState.nearbyPlaces.length - 1; i++) {
+      const startGeo = geoState.nearbyPlaces[i];
+      const endGeo = geoState.nearbyPlaces[i + 1];
+      const startGeoCoords = transformGpsToAR(startGeo.lat, startGeo.lng);
+      const endGeoCoords = transformGpsToAR(endGeo.lat, endGeo.lng);
+      const startPosition = [startGeoCoords.x, 0, startGeoCoords.z];
+      const relativePosition = [
+        endGeoCoords.x - startGeoCoords.x,
+        0,
+        endGeoCoords.z - startGeoCoords.z,
+      ];
+      newLineState.push([[...startPosition], [...relativePosition]]);
+    }
+    setLineState(newLineState);
+  }, [geoState.nearbyPlaces, lineState.length, transformGpsToAR]);
 
   // compassHeading 처리를 위한 useEffect, mount시 설정, unmount시 해제
   useEffect(() => {
@@ -88,6 +132,7 @@ const MyScene = props => {
       if (geoState.compassHeading === 0) {
         const newGeoState = {...geoState};
         newGeoState.compassHeading = heading.heading;
+        newGeoState.locationReady = true;
         setGeoState(newGeoState);
         CompassHeading.stop();
       }
@@ -140,14 +185,21 @@ const MyScene = props => {
         title: 'SSAFY',
         lat: 37.50140451172083,
         lng: 127.03979415506103,
-        icon: 'https://scontent-ssn1-1.xx.fbcdn.net/v/t1.6435-9/71141193_2565410353480610_6037255603217235968_n.png?_nc_cat=101&ccb=1-7&_nc_sid=e3f864&_nc_ohc=w8_pfVyLYaMAX8EuvLt&_nc_ht=scontent-ssn1-1.xx&oh=00_AfAV95Avg9lZ9XtFFtIm_RD0NmysVmPE4TjZTG8Ij3ULhg&oe=6479FCBC',
+        isNode: true,
       },
       {
         id: 1,
-        title: 'Stadium',
-        lat: 37.568241037033395,
-        lng: 126.89725498876227,
-        icon: 'https://files.fcseoul.com/multi01/Club/Club/em_K09.png',
+        title: 'Hanti',
+        lat: 37.49622987173077,
+        lng: 127.05284412135079,
+        isNode: true,
+      },
+      {
+        id: 2,
+        title: 'Samsung',
+        lat: 37.50835257973258,
+        lng: 127.06271517820785,
+        isNode: true,
       },
     ];
     const newGeoState = {...geoState};
@@ -161,6 +213,12 @@ const MyScene = props => {
     }
   }, [geoState.location, getNearbyPlaces]);
 
+  useEffect(() => {
+    if (geoState.nearbyPlaces && geoState.nearbyPlaces.length > 0) {
+      getLines();
+    }
+  }, [geoState.nearbyPlaces, getLines]);
+
   // 위도, 경도 값을 m 단위로로 계산
   const latLongToMerc = useCallback((latDeg, longDeg) => {
     // From: https://gist.github.com/scaraveos/5409402
@@ -172,7 +230,7 @@ const MyScene = props => {
     return {x: xmeters, y: ymeters};
   }, []);
 
-  // GPS를 AR로 찍기
+  // GPS를 AR을 위한 값으로 변경
   const transformGpsToAR = useCallback(
     (lat, lng) => {
       const isAndroid = Platform.OS === 'android';
@@ -202,7 +260,7 @@ const MyScene = props => {
     [latLongToMerc, geoState.compassHeading, geoState.location],
   );
 
-  // 메인 함수
+  // 지도 좌표값 위치 찍기
   const placeARObjects = useCallback(() => {
     if (geoState.nearbyPlaces.length === 0) {
       return undefined;
@@ -210,7 +268,7 @@ const MyScene = props => {
 
     const placePoints = geoState.nearbyPlaces.map((item, idx) => {
       const coords = transformGpsToAR(item.lat, item.lng);
-      const scale = Math.abs(Math.round(coords.z / 15)) * 10;
+      const scale = Math.abs(Math.round(coords.z / 15));
       // const scale = 100;
       const distance = distanceBetweenPoints(geoState.location, {
         latitude: item.lat,
@@ -242,12 +300,7 @@ const MyScene = props => {
               style={styles.helloWorldTextStyle}
               position={[0, -0.75, 0]}
             />
-            <ViroImage
-              width={1}
-              height={1}
-              source={{uri: item.icon}}
-              position={[0, -1.5, 0]}
-            />
+            <ViroBox width={2} length={2} height={2} position={[0, -1.5, 0]} />
           </ViroFlexView>
         </ViroNode>
       );
@@ -255,9 +308,41 @@ const MyScene = props => {
     return placePoints;
   }, [geoState.nearbyPlaces, geoState.location, transformGpsToAR]);
 
+  // 지도 길 그리기
+  const polyLines = useCallback(() => {
+    if (lineState.length === 0) {
+      return undefined;
+    }
+
+    const drawLines = lineState.map((line, idx) => {
+      const startPoint = line[0];
+      const endPoint = line[1];
+      console.log('start :', startPoint);
+      console.log('end :', endPoint);
+
+      return (
+        <ViroPolyline
+          key={idx}
+          position={startPoint}
+          points={[startPoint, endPoint]}
+          thickness={3}
+          materials={['coloredLine']}
+        />
+      );
+    });
+    return drawLines;
+  }, [lineState]);
+
+  // AR 요소들 출력
   return (
     <ViroARScene onTrackingUpdated={onInitialized}>
+      {/* // onAnchorFound={() => console.log('onAnchorFound')}
+      // onAnchorUpdated={() => console.log('onAnchorUpdated')}
+      // onAnchorRemoved={() => console.log('onAnchorRemoved')}> */}
+      {/* <ViroARPlane minHeight={0.5} minWidth={0.5} alignment={'Horizontal'}> */}
       {geoState.locationReady && geoState.cameraReady && placeARObjects()}
+      {lineState && lineState.length > 0 && polyLines()}
+      {/* </ViroARPlane> */}
     </ViroARScene>
   );
 };
