@@ -5,6 +5,10 @@ import {
   ViroARSceneNavigator,
   ViroARPlaneSelector,
   ViroBox,
+  ViroNode,
+  ViroFlexView,
+  ViroText,
+  ViroImage,
 } from '@viro-community/react-viro';
 import Geolocation from '@react-native-community/geolocation';
 import CompassHeading from 'react-native-compass-heading';
@@ -140,10 +144,10 @@ const MyScene = props => {
       },
       {
         id: 1,
-        title: 'Church',
-        lat: 37.50230698208923,
-        lng: 127.05801958547242,
-        icon: 'https://scontent-ssn1-1.xx.fbcdn.net/v/t1.6435-9/71141193_2565410353480610_6037255603217235968_n.png?_nc_cat=101&ccb=1-7&_nc_sid=e3f864&_nc_ohc=w8_pfVyLYaMAX8EuvLt&_nc_ht=scontent-ssn1-1.xx&oh=00_AfAV95Avg9lZ9XtFFtIm_RD0NmysVmPE4TjZTG8Ij3ULhg&oe=6479FCBC',
+        title: 'Stadium',
+        lat: 37.568241037033395,
+        lng: 126.89725498876227,
+        icon: 'https://files.fcseoul.com/multi01/Club/Club/em_K09.png',
       },
     ];
     const newGeoState = {...geoState};
@@ -184,7 +188,6 @@ const MyScene = props => {
 
       if (isAndroid) {
         let degree = geoState.compassHeading;
-        console.log('디그리는', degree);
         let angleRadian = (degree * Math.PI) / 180;
         let newObjX =
           objDeltaX * Math.cos(angleRadian) - objDeltaY * Math.sin(angleRadian);
@@ -205,69 +208,51 @@ const MyScene = props => {
       return undefined;
     }
 
-    // return geoState.nearbyPlaces.map(item => {
-    //   console.log('여기서부터 item', item);
-    //   const coords = transformGpsToAR(item.lat, item.lng);
-    //   // const scale = Math.abs(Math.round(coords.z / 15));
-    //   const scale = 1000000;
-    //   const distance = distanceBetweenPoints(geoState.location, {
-    //     latitude: item.lat,
-    //     longitude: item.lng,
-    //   });
+    const placePoints = geoState.nearbyPlaces.map((item, idx) => {
+      const coords = transformGpsToAR(item.lat, item.lng);
+      const scale = Math.abs(Math.round(coords.z / 15)) * 10;
+      // const scale = 100;
+      const distance = distanceBetweenPoints(geoState.location, {
+        latitude: item.lat,
+        longitude: item.lng,
+      });
+      console.log(`${idx + 1}번째 포인트`);
+      console.log('coords :', coords);
+      console.log('distance :', distance);
+      console.log('scale :', scale);
 
-    const item = geoState.nearbyPlaces[1];
-    console.log('여기서부터 item', item);
-    const coords = transformGpsToAR(item.lat, item.lng);
-    const scale = Math.abs(Math.round(coords.z / 15));
-    // const scale = 100;
-    const distance = distanceBetweenPoints(geoState.location, {
-      latitude: item.lat,
-      longitude: item.lng,
+      return (
+        <ViroNode
+          key={item.id}
+          scale={[scale, scale, scale]}
+          rotation={[0, 0, 0]}
+          position={[coords.x, 0, coords.z]}>
+          <ViroFlexView
+            style={{alignItems: 'center', justifyContent: 'center'}}>
+            <ViroText
+              width={4}
+              height={0.5}
+              text={item.title}
+              style={styles.helloWorldTextStyle}
+            />
+            <ViroText
+              width={4}
+              height={0.5}
+              text={`${Number(distance).toFixed(2)} km`}
+              style={styles.helloWorldTextStyle}
+              position={[0, -0.75, 0]}
+            />
+            <ViroImage
+              width={1}
+              height={1}
+              source={{uri: item.icon}}
+              position={[0, -1.5, 0]}
+            />
+          </ViroFlexView>
+        </ViroNode>
+      );
     });
-    console.log('heading 확인', geoState.compassHeading);
-    console.log('여긴 coords', coords);
-    console.log('distance', distance);
-
-    return (
-      <ViroBox
-        key={geoState.nearbyPlaces[0].id}
-        height={10}
-        length={10}
-        width={10}
-        scale={[scale, scale, scale]}
-        // position={[0, 0, -300]}
-        position={[coords.x, 0, coords.z]}
-      />
-      // <ViroNode
-      //   key={item.id}
-      //   scale={[scale, scale, scale]}
-      //   rotation={[0, 0, 0]}
-      //   position={[coords.x, 0, coords.z]}>
-      //   <ViroFlexView
-      //     style={{alignItems: 'center', justifyContent: 'center'}}>
-      //     <ViroText
-      //       width={4}
-      //       height={0.5}
-      //       text={item.title}
-      //       style={styles.helloWorldTextStyle}
-      //     />
-      //     <ViroText
-      //       width={4}
-      //       height={0.5}
-      //       text={`${Number(distance).toFixed(2)} km`}
-      //       style={styles.helloWorldTextStyle}
-      //       position={[0, -0.75, 0]}
-      //     />
-      //     <ViroImage
-      //       width={1}
-      //       height={1}
-      //       source={{uri: item.icon}}
-      //       position={[0, -1.5, 0]}
-      //     />
-      //   </ViroFlexView>
-      // </ViroNode>
-    );
-    // });
+    return placePoints;
   }, [geoState.nearbyPlaces, geoState.location, transformGpsToAR]);
 
   return (
